@@ -1,12 +1,17 @@
 # -- encoding: utf-8 --
 
 import re
+import json
 import urllib
+import time
+import datetime
+
 
 def coleta_lista_linhas_belohorizonte():
     html = urllib.urlopen("http://servicosbhtrans.pbh.gov.br/bhtrans/servicos_eletronicos/transporte_qh_info.asp").read()
     linhas = re.findall("<a rel=\'external\' href=\"transporte_qh_resultado\.asp\?linha=([^\"]+)\" data-transition=\"slide\">", html)
     return linhas
+
 
 def coleta_info_linha_belohorizonte(linha_busca):
     
@@ -27,7 +32,7 @@ def coleta_info_linha_belohorizonte(linha_busca):
     linha_info["horarios"] = []
     sublinhas = [(sl_id, re.sub("[\n\r ]+", " ", sl_nome).strip()) for sl_id, sl_nome in busca_sublinhas]
     for sublinha_id, sublinha_nome in sublinhas:
-        sublinha_html = re.search("<div id=\"%s\" style=\" display:none\" >(.*?)</table>" % (sublinha_id), html, re.DOTALL).group(1)
+        sublinha_html = re.search("<div id=\"%s\" style=\" display:none\" >(.*?)</table>" % (sublinha_id.replace("(", "\(").replace(")", "\)")), html, re.DOTALL).group(1)
         horas = map(int, re.findall("<td class=\"celHoras\" > (\d+) </td>", sublinha_html))
         horas_minutos_html = re.findall("<td width=\'4%\' class=\'celMinutos\'>(.*?)</td>", sublinha_html)
         sublinha_horarios = []
@@ -42,7 +47,7 @@ def coleta_info_linha_belohorizonte(linha_busca):
     return linha_info
 
 
-def imprime_horarios_onibus_belo_horizonte(linha_busca):
+def imprime_info_linha_belohorizonte(linha_busca):
     linha_info = coleta_info_linha_belohorizonte(linha_busca)
     print "* %s" % (linha_busca)
     print "    + Numero: %s" % (linha_info["numero"])
@@ -60,9 +65,24 @@ def imprime_horarios_onibus_belo_horizonte(linha_busca):
                         print "%d:%d" % (hora, minuto),
                 print
 
-#print coleta_lista_linhas_belohorizonte()
-#print coleta_info_linha_belohorizonte("S54")
-imprime_horarios_onibus_belo_horizonte("4405")
-imprime_horarios_onibus_belo_horizonte("2402A")
-imprime_horarios_onibus_belo_horizonte("S54")
+
+def coleta_infos_belohorizonte():
+    infos = {}
+    infos["atualizado"] = int(time.time())
+    infos["linhas"] = {}
+    linhas = coleta_lista_linhas_belohorizonte()
+    for linha in linhas:
+        print "- Coletando %s" % (linha)
+        infos["linhas"][linha] = coleta_info_linha_belohorizonte(linha)
+    outfile = open("onibus_belohorizonte-%s.json" % (datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")), "w")
+    json.dump(infos, outfile)
+    outfile.close()
+
+
+
+if __name__ == "__main__":
+
+    coleta_infos_belohorizonte()
+
+
 
